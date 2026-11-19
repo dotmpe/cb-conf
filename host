@@ -1,0 +1,78 @@
+
+#if DEBUG
+#US_DEBUG=1
+#UC_DEBUG=1
+#endif
+
+export VOL_ID=25-5 # work volume, not root volume
+export OS_HOSTNAME=t460s
+export DOMAINS=lab,mpe
+export USERS=qwrt,nedry
+
+# TODO: use submodules on dev
+export UCONF=/src/local/conf-mpe+current
+export US_BIN=/src/local/script-mpe+dev+current
+export U_C=/src/local/user-conf+r0.2+current
+export U_S=/src/local/user-scripts+r0.0+current
+export US_INC=/src/local/user-scripts-incubator+dev+current
+export HTDOCS=/srv/annex-25-5/htdocs-mpe
+
+#export SCRIPT_PATHS="C_INC UCONF US_INC US_BIN U_S U_C HTDOCS"
+
+export LUA_INCDIR=/usr/include/lua5.2
+
+# XXX: 
+export UC_PROFILE=user-script.shdev+init\ user-conf.mpe+init
+
+export EDITOR=vim
+export USER_EMAIL=admin@dotmpe.com
+
+export DESKTOP_BACKGROUND=/usr/share/images/bunsen/wallpapers/default/Boron-Emerald-plain-1920x1080.png
+
+export DESKTOP_COLORS=dark
+CS=$DESKTOP_COLORS
+    
+export US_THEME_ID=BL-Boron
+# This also affects firefox's prefers-color-scheme attribute.
+export GTK_THEME=Adwaita:$CS
+
+export DPF_GEOM=510x580+1395+1350
+export DPF_DELAY=8
+export DPF_FOLDER=$HOME/Pictures/Aesthetics/Water,$CS
+
+export DESKTOP_PICTURE_FRAME=DPF:497x572+1386+172:/srv/home-local/Pictures/Aesthetics/Girls/Zebra_girl/48198.jpg
+#export DESKTOP_PICTURE_FRAME=DPF:497x572+1386+172:/srv/home-local/Pictures/Aesthetics:r
+
+export DESKTOP_WINDOW_SHADING=20
+export DESKTOP_WINDOW_SHADING0=20
+export DESKTOP_WINDOW_SHADING1=40
+export DESKTOP_WINDOW_SHADING2=50
+
+#export US_THEME_VTE=User_Script_Palette_solarized18_light
+#export US_THEME_VTE=User_Script_Palette_solarized18_dark
+export US_THEME_VTE=User_Script_Palette_blboron18_dark
+
+# XXX: doesnt work well on t460s
+#export US_THEME_DIRCOLORS=solarized-256dark.conf
+
+export VIM_THEME_BG=0
+export VIM_THEME=nord
+export VIM_AIRLINE_THEME=nord
+#export VIM_AIRLINE_THEME=fairyfloss
+
+export BAT_THEME=Nord
+#export BAT_THEME=chauvet256dark
+
+# Move CS change 1h forward
+#export DARKTIME_SHIFT=3600
+
+# XXX: there are a lot of hardcoded refs to ~/.local/statusdir. Not entirely
+# sure what to do with SD setup yet.
+export STATUSDIR_ROOT=$HOME/.local/var/statusdir/
+#export STATUSDIR_USER=
+#export STATUSDIR_HOST=
+
+# Use version 3 API (etcdctl)
+export ETCDCTL_API=3
+
+# ex:ft=sh:
