@@ -1,0 +1,9 @@
+#!/bin/rc
+window 0,0,161,117 stats -lmisce
+window bar
+
+window -miny 160 -dy 400 -dx 900 -scroll rc
+
+# run a system shell on the serial console
+~ $#console 0 || prompt=('cons% ' '  ') window -m -scroll -miny 200 -dx 800 console
+

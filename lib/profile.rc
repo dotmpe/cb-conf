@@ -1,0 +1,40 @@
+bind -a $home/bin/rc /bin
+bind -a $home/bin/$cputype /bin
+if(! syscall create /tmp/xxx 1 0666 >[2]/dev/null)
+	ramfs	# in case we're running off a cd
+if(~ $#font 0 || ~ $font '')
+    # bold (good), but a bit small
+    #font=/lib/font/bit/vga/unicode.font
+    # I found none of the other fonts working properly
+    # good size but a bit light, no bold available?
+    font=/lib/font/bit/terminus/unicode.14.font
+    # Only has face for meta/special keys (and keys are broken)
+    #font=/lib/font/bit/lucidasans/boldunicode.13.font
+    # Good font, but no meta/special glyphs (just squares)
+    #font=/lib/font/bit/dejavusansbd/unicode.18.font
+switch($service){
+case terminal
+	if(! webcookies >[2]/dev/null)
+		webcookies -f /tmp/webcookies
+	webfs
+	plumber
+	echo -n accelerated > '#m/mousectl'
+	echo -n 'res 3' > '#m/mousectl'
+	prompt=('term% ' '	')
+	fn term%{ $* }
+    @{rfork n; aux/realemu; aux/vga -l $vgasize}
+    rio -i riostart
+case cpu
+	bind /mnt/term/dev/cons /dev/cons
+	bind -q /mnt/term/dev/consctl /dev/consctl
+	>[2] /dev/null {
+		cp /dev/sysname /mnt/term/dev/label
+		if(test -s /mnt/term/env/wsys)
+			wsys=/mnt/term^`{cat /mnt/term/env/wsys}
+	} 
+	bind -a /mnt/term/dev /dev
+	prompt=('cpu% ' '	')
+	fn cpu%{ $* }
+case con
+	prompt=('cpu% ' '	')
+}
