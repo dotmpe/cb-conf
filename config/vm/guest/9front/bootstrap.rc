@@ -1,0 +1,16 @@
+# Guest entrypoint for the 9front composition.
+# The config disc dials the shares, then sources this file from the repo share.
+# Edit it on the host; the guest sees the file through that share.
+
+# Configure profile
+
+# Setup work checkout
+if (~ $#GIT_URL 0) GIT_URL=''
+if (~ $#GIT_DEST 0) GIT_DEST=''
+if (! ~ $GIT_URL '' && ! test -e $GIT_DEST) {
+	mkdir -p `{cleanname -d $GIT_DEST}
+	git/clone $GIT_URL $GIT_DEST ||
+		echo 'uc-vm: git/clone failed; the host tree stays on the repo share' >[1=2]
+  echo uc-vm git clone done
+}
+echo uc-vm bootstrap done

@@ -1,0 +1,7 @@
+.local/build
+.local/cache
+.local/config
+.local/user
+*.sw[pon]
+.vm-work/
+__pycache__

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Guest entrypoint for the cb-headless composition.
+# Cloud-init mounts the shares, then runs this file from the repo share.
+# Edit it on the host; the guest sees the file through that share.
+set -eu
+if [ -f /etc/uc-vm/guest.env ]; then
+  # shellcheck disable=SC1091
+  . /etc/uc-vm/guest.env
+fi
+if [ -n "${GIT_URL:-}" ] && [ -n "${GIT_DEST:-}" ] && [ ! -e "$GIT_DEST" ]; then
+  mkdir -p "$(dirname "$GIT_DEST")"
+  git clone --no-hardlinks "$GIT_URL" "$GIT_DEST"
+fi
+echo "uc-vm: bootstrap done" >/dev/console 2>/dev/null || true

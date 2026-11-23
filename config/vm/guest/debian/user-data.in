@@ -1,0 +1,9 @@
+#cloud-config
+# uc-vm appends write_files, ssh_authorized_keys, and runcmd.
+# Those keys belong to the generator. Guest work goes in ./bootstrap.
+hostname: cb-headless
+manage_etc_hosts: true
+package_update: true
+packages:
+  - git
+  - ca-certificates
