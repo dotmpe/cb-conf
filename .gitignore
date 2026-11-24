@@ -5,3 +5,5 @@
 *.sw[pon]
 .vm-work/
 __pycache__
+env*
+lib/git

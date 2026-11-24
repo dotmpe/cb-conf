@@ -23,11 +23,12 @@ qemu_vm::disk_create() {
   local fmt=${3:-qcow2}
 
   if [[ ! -s "$disk" ]]; then
-    printf "${_f0-}"
-    qemu-img create -f "$fmt" "$disk" "$size" &&
-    printf "${NORMAL-}" &&
-    std_info "Created disk ${_f2-}${disk@Q}" ||
-      failerr "E$? while creating disk ${_f2-}${disk@Q}" || return
+    { printf "${_f0-}"
+      qemu-img create -f "$fmt" "$disk" "$size" &&
+      printf "${NORMAL-}" &&
+      std_info "Created disk ${_f2-}${disk@Q}" ||
+        failerr "E$? while creating disk ${_f2-}${disk@Q}" || return
+    } >&2
   fi
 }
 
@@ -35,10 +36,11 @@ qemu_vm::disk_resize() {
   local disk=${1:?disk path required}
   local size=${2:?new size required (e.g. 20G)}
 
-  printf "${_f0-}"
-  qemu-img resize "$disk" "$size" &&
-  printf "${NORMAL-}" &&
-  std_info "Resized disk ${disk@Q}"
+  { printf "${_f0-}"
+    qemu-img resize "$disk" "$size" >&2 &&
+    printf "${NORMAL-}" &&
+    std_info "Resized disk ${disk@Q}"
+  } >&2
 }
 
 qemu_vm::disk_overlay() {
@@ -50,28 +52,30 @@ qemu_vm::disk_overlay() {
   [[ -s "$backing" ]] ||
     failerr "qemu_vm::disk_overlay: backing file not found: $backing" || return
 
-  printf "${_f0-}"
-  qemu-img create -f qcow2 -b "$backing" -F "$backing_fmt" "$overlay" &&
-  printf "${NORMAL-}" &&
-  std_info "Created overlay ${_f2-}${overlay@Q}" ||
-    failerr "E$? while creating overlay ${_f4-}${overlay@Q}" || return
+  { printf "${_f0-}"
+    qemu-img create -f qcow2 -b "$backing" -F "$backing_fmt" "$overlay" &&
+    printf "${NORMAL-}" &&
+    std_info "Created overlay ${_f2-}${overlay@Q}" ||
+      failerr "E$? while creating overlay ${_f4-}${overlay@Q}" || return
 
-  if [[ -n "$size" ]]; then
-    printf "${_f0-}"
-    qemu-img resize "$overlay" "$size" &&
-    printf "${NORMAL-}" ||
-      failerr "qemu_vm::disk_overlay: failed to resize ${_f4-}${overlay@Q}" return
-  fi
+    if [[ -n "$size" ]]; then
+      printf "${_f0-}"
+      qemu-img resize "$overlay" "$size" &&
+      printf "${NORMAL-}" ||
+        failerr "qemu_vm::disk_overlay: failed to resize ${_f4-}${overlay@Q}" return
+    fi
+  } >&2
 }
 
 qemu_vm::disk_info() {
   local disk=${1:?disk path required}
 
   [[ -s $disk ]] || failerr "No data at ${_f4-}${disk@Q}" || return
-  printf "${_f0-}"
-  qemu-img info "$disk" ||
-    failerr "E$? reading disk info from ${_f4-}${disk@Q}" || return
-  printf "${NORMAL-}"
+  { printf "${_f0-}"
+    qemu-img info "$disk" ||
+      failerr "E$? reading disk info from ${_f4-}${disk@Q}" || return
+    printf "${NORMAL-}"
+  } >&2
 }
 
 # ----------------------------------------------------------------------
@@ -235,12 +239,12 @@ qemu_vm::display() {
   local vga=${3:-virtio} # virtio|std|none
 
   case "$disp" in
-  ( none) _cmd_ref+=( -display none ) ;;
-  ( vnc=*) _cmd_ref+=( -display none -vnc "${disp#vnc=}" ) ;;
-  ( gtk|sdl|curses)
+  ( none ) _cmd_ref+=( -display none ) ;;
+  ( vnc=* ) _cmd_ref+=( -display none -vnc "${disp#vnc=}" ) ;;
+  ( gtk|sdl|curses )
         _cmd_ref+=( -display "$disp" )
       ;;
-  ( *) _cmd_ref+=( -display "$disp" )
+  ( * ) _cmd_ref+=( -display "$disp" )
   esac
 
   if [[ -n "$vga" && "$vga" != "none" ]]; then
@@ -288,12 +292,24 @@ qemu_vm::ovmf() {
 # ----------------------------------------------------------------------
 
 qemu_vm::dump_cmd() {
+: param ' ~ <Command-array> [<Plain:=0>] ...'
+: about 'Dump the composed command'
+: extended 'Typeset command line, default is Bash array used to compose'
   local -n _cmd_ref=${1:?cmd array required}
-  printf '%q ' "${_cmd_ref[@]}"
-  echo
+  local _cmd_plain=${2:-0}
+
+  if ((_cmd_plain)); then
+    printf '%q ' "${_cmd_ref[@]}"
+    echo
+  else
+    # TODO: format nicely as well
+    declare -p $1
+  fi
 }
 
 qemu_vm::run() {
+: param ' ~ <Command-array> <Extra-args...>'
+: about 'Run the composed command and return'
   local -n _cmd_ref=${1:?cmd array required}
   shift
   local extra_args=( "$@" )
@@ -682,13 +698,15 @@ instance-id: ${VM_NAME:-vm}-${sum}
 local-hostname: ${VM_NAME:-vm}
 dsmode: local
 EOF
-  printf "${_f6-}"
-  rm -vf "$img"
-  printf "${_f0-}"
-  cloud-localds "$img" "$user_data" "$meta" &&
-  printf "${NORMAL-}" ||
-    failerr "uc-vm: cloud-localds failed for ${_f2-}${img}${NORMAL-}" || return
-  echo "${_f6-}uc-vm: ${_f7-}wrote localds ${_f2-}${img}${NORMAL-}" >&2
+  {
+    printf "${_f6-}"
+    rm -vf "$img" || return
+    printf "${_f0-}"
+    cloud-localds "$img" "$user_data" "$meta" &&
+    printf "${NORMAL-}" ||
+      failerr "uc-vm: cloud-localds failed for ${_f2-}${img}${NORMAL-}" || return
+  } >&2
+  >&2 echo "${_f6-}uc-vm: ${_f7-}wrote localds ${_f2-}${img}${NORMAL-}"
   VM_PROV_IMG=$img
   VM_BOOT_HINT=$(
     cat <<EOF
@@ -819,6 +837,7 @@ qemu_vm::load_composition() {
 
   # shellcheck source=/dev/null
   qemu_vm::load_seeds "${SEEDS_CONF:-config/vm/seeds.conf}" &&
+  std_info "Composition ${target} reset to seed from ${_f2-}${_@Q}" &&
   qemu_vm::reset_composition &&
 
   \builtin . "$comp_path"
@@ -829,6 +848,7 @@ qemu_vm::compose() {
   local target=${2:?composition name or file required}
   local work_dir=${3:-${VM_WORK_DIR:-${PWD}/.vm-work}}
 
+  std_info "Composing command target ${_f4-}${target} at ${_f2-}${work_dir@Q}" &&
   qemu_vm::load_composition "$target" || return 1
 
   qemu_vm::init _out_cmd "${VM_ARCH:-x86_64}" || return 1
@@ -847,6 +867,7 @@ qemu_vm::compose() {
 
     if ((VM_EPHEMERAL)); then
       local overlay_disk="${work_dir}/${VM_NAME:-vm}-overlay.qcow2"
+      std_info "Adding ephemeral overlay disk for ${_f4-}${target} at ${_f2-}${overlay_disk@Q}"
       # Drop the previous overlay so a cidata first-boot runs on every launch.
       rm -f "$overlay_disk" || return
       if [[ -f "$seed_cache" ]]; then
@@ -868,6 +889,7 @@ qemu_vm::compose() {
     local iso_path="${VM_ISOS[$VM_ISO]:-$VM_ISO}"
     local run_disk="${work_dir}/${VM_NAME:-vm}.qcow2"
     local drive_if="${VM_DRIVE_IF:-virtio}"
+    std_info "Using CoW and ISO9660 disk for ${_f4-}${target}"
     mkdir -p "$work_dir"
     qemu_vm::disk_create "$run_disk" "${VM_DISK_SIZE:-20G}" qcow2 || return 1
     qemu_vm::add_drive _out_cmd "$run_disk" qcow2 "$drive_if"
@@ -877,6 +899,7 @@ qemu_vm::compose() {
   # 2. Networking
   if [[ "${VM_NET_MODE:-user}" == "user" ]]; then
     local fwd_str="" item
+    std_info "Adding user networking with port forwarding on ${_f4-}${target}"
     for item in "${VM_PORT_FORWARDS[@]}"; do
       if [[ -z "$fwd_str" ]]; then
         fwd_str="$item"
@@ -886,6 +909,7 @@ qemu_vm::compose() {
     done
     qemu_vm::net_user _out_cmd "$fwd_str"
   elif [[ "${VM_NET_MODE:-}" == "none" ]]; then
+    std_info "No networking for ${_f4-}${target}"
     qemu_vm::net_none _out_cmd
   fi
 
@@ -896,40 +920,50 @@ qemu_vm::compose() {
   # 4. Display & Serial
   qemu_vm::display _out_cmd "${VM_DISPLAY:-none}" "${VM_VGA:-none}"
   if [[ -n "${VM_SERIAL:-}" ]]; then
+    std_info "Adding VM serial I/O for ${_f4-}${target}"
     qemu_vm::serial _out_cmd "$VM_SERIAL"
   fi
 
   # 5. Provisioning
   if [[ "${VM_PROVISION:-}" == "smbios" && -n "${VM_PROVISION_URL:-}" ]]; then
+    std_info "VM will use smbios ${_f4-}${target} ${_f2-}${VM_PROVISION_URL}"
     qemu_vm::smbios_nocloud _out_cmd "$VM_PROVISION_URL"
   elif [[ "${VM_PROVISION:-}" == "cidata" ]]; then
     [[ "${VM_SHARE:-9p}" == 9p ]] ||
       failerr "uc-vm: cidata bootstrap mounts virtio-9p; set VM_SHARE=9p" || return 1
+    std_info "VM will read cloud-init via 9p ${_f4-}${target} ${_f2-}${VM_PROV_IMG}"
     qemu_vm::build_cidata "$work_dir" || return 1
     qemu_vm::cidata_drive _out_cmd "$VM_PROV_IMG"
   elif [[ "${VM_PROVISION:-}" == "iso9660" ]]; then
     [[ "${VM_SHARE:-}" == u9fs ]] ||
       failerr "uc-vm: iso9660 bootstrap dials a 9p server; set VM_SHARE=u9fs" || return 1
+    std_info "VM will use ISO9660 drive ${_f4-}${target} ${VM_DRIVE_IF} ${_f2-}${VM_PROV_IMG}"
     qemu_vm::build_bootiso "$work_dir" || return 1
     qemu_vm::add_data_cdrom _out_cmd "$VM_PROV_IMG" "${VM_DRIVE_IF:-ide}" 2
   elif [[ -n "${VM_CIDATA_IMG:-}" ]]; then
+    std_info "VM will use cloud-init data ${_f4-}${target} ${_f2-}${VM_PROV_IMG}"
     qemu_vm::cidata_drive _out_cmd "$VM_CIDATA_IMG"
   fi
 
   # 6. Direct kernel boot (if specified)
   if [[ -n "${VM_KERNEL:-}" ]]; then
+    std_info "Applying kernel initrd/cmdline ${_f4-}${target} ${_f2-}${VM_KERNEL-} ${VM_INITRD-} ${VM_CMDLINE-}"
     qemu_vm::kernel_boot _out_cmd "$VM_KERNEL" "${VM_INITRD:-}" "${VM_CMDLINE:-}"
   fi
 
   # 7. Pointing Device (USB Tablet for absolute mouse tracking)
   if ((VM_USB_TABLET)); then
+    std_info "Applying usb-tablet input mode ${_f4-}${target}"
     _out_cmd+=( -usb -device usb-tablet )
   fi
 
   # 8. Extra user arguments
   if ((${#VM_EXTRA_ARGS[@]} > 0)); then
+    std_info "Applying extra VM arguments${_f4-}${target} ${_f2-}${VM_EXTRA_ARGS[*]@Q}"
     _out_cmd+=( "${VM_EXTRA_ARGS[@]}" )
   fi
+
+  std_info "Done compositioning ${_f4-}${target}"
 }
 
 qemu_vm::to_json() {

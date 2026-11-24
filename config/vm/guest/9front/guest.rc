@@ -1,0 +1,14 @@
+9660srv
+mounted=()
+for (d in /dev/sdD0/data /dev/sd*/data) {
+  if (~ $#mounted 0) {
+    if (mount /srv/9660 /n/cfg $d >[2]/dev/null) {
+      if (test -f /n/cfg/startup.rc) { mounted=$d; echo $d }
+      if not unmount /n/cfg
+    }
+  }
+}
+. /n/cfg/1stboot.rc
+# If you include lib/git/config with the ISO
+#cp /n/cfg/gitconfig-user $home/lib/git/config
+. /n/cfg/startup.rc

@@ -12,8 +12,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-#cd "$REPO_ROOT"
-
 PATH+=:${U_S:?User profile broken}/tool/bash/include
 . "us-core.inc.bash"
 . "us-common.inc.bash"
@@ -41,6 +39,11 @@ Commands:
   cmd <comp>                    Print compiled QEMU command line
   run <comp> [extra_args...]    Launch VM composition
 
+Env:
+  QUIET 0|1
+  VERBOSE 0|1
+  DEBUG 0|1
+  TERM
 EOF
   exit 1
 }
@@ -49,6 +52,8 @@ cmd="${1:-}"
 shift || true
 
 case "$cmd" in
+# ( compose ) XXX: is it possible/ideal at all...
+
 ( list )
       qemu_vm::list_compositions
     ;;
@@ -87,10 +92,11 @@ case "$cmd" in
       qemu_vm::dump_cmd vm_cmd
     ;;
 
-( run)
+( run )
       target="${1:?composition name required}"
-      shift || true
+      shift || exit
       declare -a vm_cmd=()
+
       qemu_vm::compose vm_cmd "$target"
       if [[ -n "${VM_BOOT_HINT:-}" ]]; then
         printf '%s\n' "$VM_BOOT_HINT" >&2
@@ -101,6 +107,43 @@ case "$cmd" in
       else
         qemu_vm::run vm_cmd "$@"
       fi
+    ;;
+
+( typeset )
+      target="${1:?composition name required}"
+      shift || exit
+      # XXX: the python http server may not be needed for the setup, the
+      # template may be modified to better integrate with hints/command
+      # and as well extra args
+
+      declare -a vm_cmd=()
+      qemu_vm::compose vm_cmd "$target"
+      if [[ -n "${VM_BOOT_HINT:-}" ]]; then
+        printf '%s\n' "$VM_BOOT_HINT" >&2
+      fi
+      if [[ -n "${VM_SHARE_SCRIPT:-}" ]]; then
+        printf 'share supervisor: %s\n' "$VM_SHARE_SCRIPT" >&2
+      fi
+      echo "# Script begins here: "
+      printf \
+': env "${_f1:=$(tput setaf 1 2>/dev/null)}"
+: env "${_f3:=$(tput setaf 3 2>/dev/null)}"
+: env "${NORMAL:=$(tput sgr0 2>/dev/null)}"
+
+set -x
+killall python.-m.http.server || :
+\\builtin command python -m http.server &
+srvpid=$!
+stat=0
+\\builtin command '
+printf '%q ' "${vm_cmd[@]}"
+printf '|| stat=$?
+kill -9 ${srvpid-} || >&2 echo "${_f3-}E$? closing python http server (ignored)${NORMAL-}"
+pkill -f python.-m.http.server
+! ((stat)) || >&2 echo "${_f1-}QEMU returned E$?${NORMAL-}"
+# reset
+exit ${stat-}
+'
     ;;
 
 ( * )
