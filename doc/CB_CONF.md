@@ -11,21 +11,95 @@ another dotfiles repo but for platforms like routers or SoC that can hold some p
 but need to work within constrained memory and/or diskless cq slow, read-only boot and root platforms.
 
 ## Profiles
+XXX: both uc-vm.bash cmd and run reset the overlay, so either run single-use
+sessions or keep the command output in a fresh script.
 
 ### 9front experimental desktop
-
 Plan 9 is a distributed system, but the downloadable 9front disk is ready to run a single-host system called 'cirno', with user 'glenda'.
 Normally the system CPU, storage, and other resources may be provided by dedicated hosts on different platforms.
 
-These are the additional steps, to go from a downloaded QoW disk to a running, online and customized 9front.
+Setting up the 9front QEMU desktop from CoW seed disk entails:
 
-- Fix the monitor setup so Rio starts
-- Customize `$home/bin/rc/riostart` for personal startup app windows
-- Customize sysname, by creating `/rc/bin/termrc.local`
-- Customize UI font via `lib/profile`
+- Configure for a VESA monitor setup so that Rio starts
+- Set other boot parameters `plan9.ini` for promptless startup
+- Customize sysname in `/rc/bin/termrc.local` for custom host name
+- Customize apps in `$home/bin/rc/riostart` for personal startup windows
+- Customize UI font via `lib/profile` (only a few choices, but you do not need to use VGA fonts)
+- Configure the IP address
 
-- TODO: Configure network
-- Make a Git clone and do some work
+The simplest to do the above is to either use a custom CD-ROM image to input the bootstrap scripts,
+or start the network and download the script. The latter is the least script but
+requires a python http.server running on the host's project folder. To do all
+above setup steps:
+```rc
+term% ip/config
+term% conf_url='http://10.0.2.2:8000/'
+term% hget $conf_url/config/vm/guest/9front/1stboot.rc | rc
+term% hget $conf_url/lib/git/config-user > lib/git/config
+# Or via a tarbal package
+# hget http://10.0.2.2:8000/bundle.tar | tar x
+```
+
+The desktop should now start, and provide one regular rc terminal window and one for an rc session that also appears at the console.
+Output from scripts during bootstrap wil be drawn on the root pane.
+
+With the `uc-vm.bash` commands instead of the above the custom CD-ROM ISO may used for the same, only but without HTTP networking if you like:
+```rc
+9660srv
+mounted=()
+for (d in /dev/sdD0/data /dev/sd*/data) {
+  if (~ $#mounted 0) {
+    if (mount /srv/9660 /n/cfg $d >[2]/dev/null) {
+      if (test -f /n/cfg/startup.rc) { mounted=$d; echo $d }
+      if not unmount /n/cfg
+    }
+  }
+}
+. /n/cfg/1stboot.rc
+# If you include lib/git/config with the ISO
+#cp /n/cfg/gitconfig-user $home/lib/git/config
+. /n/cfg/startup.rc
+```
+
+The above is more of a sketch than a polished demo.
+XXX: Also like vgasize it may be possible to paramterize your scripts through plan9.ini itself
+
+Now make a Git clone and do some work:
+```rc
+term% cd $home/src/local
+term% git/clone ssh://glenda@10.0.2.2/usr/git/local/cb-conf.git
+term$ echo Work > newfile
+term% git/add newfile
+term% git/commit -m "Something something" .
+term% git/push
+```
+
+The above assumes:
+
+- Project work trees go into `src/local`, or `src/vendor/<domain>/<owner>` depending on wether they are primary or not.
+
+- Bare repos can live under `$home/git`, besides the `lib/git` dir with user git config (see /sys/lib/git/config for global settings).
+
+  Under `$home/git`: `local/<owner>` for a user's repo collection, or/and `vendor/<vendor>/<owner>` for everything else.
+
+  But note: as namespaces can be build outside of the filetree there is no need to invent intermediate *symbolic* paths, like ~/project or ./local for things that are really in /src, /usr, /mnt, /srv or elsewhere.
+  Ony unless you specifically want to, to make such group to insert as a layer through the binds for a certain process namespace.
+
+  (But so `local/<owner>` may already be superfluous or redundant.)
+
+Future improvements:
+
+- TODO: test/demo plan9.ini for bootstrap param other than vgasize or standard
+- TODO: Config (git/email/...) user other than glenda
+- TODO: git guestrc demo params [see guest.rc bootstrap]
+- TODO: email inbox demo idem
+- TODO: menu for listing other demo scripts and command collections:
+
+  - viewer for native and/or web images, documents, other media:
+  - video
+  - CAD/SVG/plot, look for diagrams (ie. dot), or simple graphics context API
+  - GIS/maps
+  - 3D/mesh
 
 #### 9front first boot
 To boot the VM into the desktop (Rio) environment, the monitor has to be put in VESA mode in the boot config.
@@ -102,7 +176,7 @@ Some shortcut keys are:
 
 Note that only the erase also works in the console (window).
 
-There is no history built in, or available via some readline lib like in Linux (but there is a history command).
+There is no history built in, or available via some readline lib like in Linux.
 
 There is no `less`, or `more`. There is cat, head or tail, awk, grep and many others you will know from Linux/BSD type shell already.
 
@@ -115,6 +189,12 @@ No find, use `walk`, or `du -a . | grep pattern`.
 
 When editing files remember to leave the last line-end/EOL or you will get
 problems like rc syntax errors on the last file line.
+
+Functions are exported, and can be found in env:
+```
+term% fn myfun {echo $*}
+term% ls /env|grep fn
+```
 
 #### 9front desktop usage
 Plan 9 is heavy on mouse chording for control.
@@ -157,6 +237,5 @@ The workflow takes some getting use to.
 In the terminal, any text can be edited. In acme as well, and 
 
 `wloc` outputs the current windows, with geometry and command name.
-
 
 ######

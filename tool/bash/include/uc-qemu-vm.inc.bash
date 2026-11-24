@@ -23,9 +23,11 @@ qemu_vm::disk_create() {
   local fmt=${3:-qcow2}
 
   if [[ ! -s "$disk" ]]; then
+    printf "${_f0-}"
     qemu-img create -f "$fmt" "$disk" "$size" &&
-    std_info "Created disk ${disk@Q}" ||
-      failerr "E$? while creating ${disk@Q}" || return
+    printf "${NORMAL-}" &&
+    std_info "Created disk ${_f2-}${disk@Q}" ||
+      failerr "E$? while creating disk ${_f2-}${disk@Q}" || return
   fi
 }
 
@@ -33,7 +35,9 @@ qemu_vm::disk_resize() {
   local disk=${1:?disk path required}
   local size=${2:?new size required (e.g. 20G)}
 
+  printf "${_f0-}"
   qemu-img resize "$disk" "$size" &&
+  printf "${NORMAL-}" &&
   std_info "Resized disk ${disk@Q}"
 }
 
@@ -46,15 +50,28 @@ qemu_vm::disk_overlay() {
   [[ -s "$backing" ]] ||
     failerr "qemu_vm::disk_overlay: backing file not found: $backing" || return
 
-  qemu-img create -f qcow2 -b "$backing" -F "$backing_fmt" "$overlay" || return
-  [[ -z "$size" ]] ||
-    qemu-img resize "$overlay" "$size" ||
-      failerr "qemu_vm::disk_overlay: failed to resize ${overlay@Q}"
+  printf "${_f0-}"
+  qemu-img create -f qcow2 -b "$backing" -F "$backing_fmt" "$overlay" &&
+  printf "${NORMAL-}" &&
+  std_info "Created overlay ${_f2-}${overlay@Q}" ||
+    failerr "E$? while creating overlay ${_f4-}${overlay@Q}" || return
+
+  if [[ -n "$size" ]]; then
+    printf "${_f0-}"
+    qemu-img resize "$overlay" "$size" &&
+    printf "${NORMAL-}" ||
+      failerr "qemu_vm::disk_overlay: failed to resize ${_f4-}${overlay@Q}" return
+  fi
 }
 
 qemu_vm::disk_info() {
   local disk=${1:?disk path required}
-  qemu-img info "$disk"
+
+  [[ -s $disk ]] || failerr "No data at ${_f4-}${disk@Q}" || return
+  printf "${_f0-}"
+  qemu-img info "$disk" ||
+    failerr "E$? reading disk info from ${_f4-}${disk@Q}" || return
+  printf "${NORMAL-}"
 }
 
 # ----------------------------------------------------------------------
@@ -67,8 +84,7 @@ qemu_vm::init() {
   local qemu_bin="qemu-system-${arch}"
 
   if ! \builtin command -v "$qemu_bin" >/dev/null 2>&1; then
-    >&2 echo "qemu_vm::init: binary not found in PATH: $qemu_bin"
-    return 1
+    failerr "qemu_vm::init: binary not found in PATH: ${_f4-}${qemu_bin@Q}" || return
   fi
 
   _cmd_ref=( "$qemu_bin" )
@@ -89,8 +105,7 @@ qemu_vm::accel() {
         fi
       ;;
     ( * )
-      >&2 echo "qemu_vm::accel: unknown accel mode '$mode' (expected kvm|tcg|auto)"
-      return 1
+      failerr "qemu_vm::accel: unknown accel mode '$mode' (expected kvm|tcg|auto)" 1
   esac
 }
 
@@ -283,6 +298,7 @@ qemu_vm::run() {
   shift
   local extra_args=( "$@" )
 
+  >&2 echo "${_f6-}> ${_f7-}${_cmd_ref[*]@Q} ${NORMAL-}${extra_args[*]@Q}"
   \builtin command "${_cmd_ref[@]}" "${extra_args[@]}"
 }
 
@@ -370,7 +386,7 @@ qemu_vm::parse_mount() {
   local rest
 
   [[ "$spec" == *:*:*:* ]] ||
-    failerr "uc-vm: mount spec needs name:host:guest:mode: $spec" || return
+    failerr "uc-vm: ${NORMAL-}mount spec needs name:host:guest:mode: ${_f4-}${spec@Q}" || return
   _pm_name=${spec%%:*}
   rest=${spec#*:}
   _pm_mode=${rest##*:}
@@ -379,19 +395,19 @@ qemu_vm::parse_mount() {
   _pm_host=${rest%:*}
 
   [[ "$_pm_name" =~ ^[A-Za-z][A-Za-z0-9_]{0,31}$ ]] ||
-    failerr "uc-vm: mount name must be a short identifier: ${_pm_name}" || return
+    failerr "uc-vm: ${NORMAL-}mount name must be a short identifier: ${_f4-}${_pm_name@Q}" || return
   [[ -n "$_pm_host" && "$_pm_guest" == /* ]] ||
-    failerr "uc-vm: mount ${_pm_name} needs an absolute guest path: $spec" || return
+    failerr "uc-vm: ${NORMAL-}mount ${_pm_name} needs an absolute guest path: ${_f4-}${spec@Q}" || return
   [[ "$_pm_mode" == ro || "$_pm_mode" == rw ]] ||
-    failerr "uc-vm: mount ${_pm_name} mode must be ro or rw: $spec" || return
+    failerr "uc-vm: ${NORMAL-}mount ${_pm_name} mode must be ro or rw: ${_f4-}${spec@Q}" || return
   [[ "$_pm_host" != *,* && "$_pm_guest" != *,* ]] ||
-    failerr "uc-vm: mount paths cannot contain a comma: $spec" || return
+    failerr "uc-vm: ${NORMAL-}mount paths cannot contain a comma: ${_f4-}${spec@Q}" || return
 }
 
 qemu_vm::squote_ok() {
   local s=$1
   if [[ "$s" == *\'* ]]; then
-    failerr "uc-vm: value contains a single quote: $s" || return
+    failerr "uc-vm: ${NORMAL-}value contains a single quote: ${_f4-}${s@Q}" || return
   fi
 }
 
@@ -666,10 +682,13 @@ instance-id: ${VM_NAME:-vm}-${sum}
 local-hostname: ${VM_NAME:-vm}
 dsmode: local
 EOF
-  rm -f "$img"
-  cloud-localds "$img" "$user_data" "$meta" >&2 ||
-    failerr "uc-vm: cloud-localds failed for ${img}" || return
-  echo "uc-vm: wrote ${img}" >&2
+  printf "${_f6-}"
+  rm -vf "$img"
+  printf "${_f0-}"
+  cloud-localds "$img" "$user_data" "$meta" &&
+  printf "${NORMAL-}" ||
+    failerr "uc-vm: cloud-localds failed for ${_f2-}${img}${NORMAL-}" || return
+  echo "${_f6-}uc-vm: ${_f7-}wrote localds ${_f2-}${img}${NORMAL-}" >&2
   VM_PROV_IMG=$img
   VM_BOOT_HINT=$(
     cat <<EOF
@@ -757,7 +776,7 @@ EOF
     genisoimage -o "$img" -V cfg -R -J .
   ) >/dev/null ||
     failerr "uc-vm: genisoimage failed for ${img}" || return
-  echo "uc-vm: wrote ${img}" >&2
+  echo "${_f6-}uc-vm: wrote ${_f2-}${img}${NORMAL-}" >&2
   VM_PROV_IMG=$img
   VM_BOOT_HINT=$(cat <<EOF
 ${VM_NAME}: 9P2000 server on 127.0.0.1:${port} (guest dials 10.0.2.2).
@@ -1041,17 +1060,17 @@ qemu_vm::list_seeds() {
   local seeds_file=${1:-config/vm/seeds.conf}
   qemu_vm::load_seeds "$seeds_file" || return
   if [[ ${VM_SEEDS[*]:+set} ]]; then
-    echo "Seeds:"
+    echo "${_f6-}Seeds:"
     for k in "${!VM_SEEDS[@]}"; do
-      echo "  $k -> ${VM_SEEDS[$k]}"
+      echo "${_f7-}  $k ${NORMAL-}-> ${VM_SEEDS[$k]}"
     done
   else
     failmsg "No seed keys/URLs configured! (vm/seeds.conf: VM_SEED)"
   fi
   if [[ ${VM_ISOS[*]:+set} ]]; then
-    echo "ISOs:"
+    echo "${_f6-}ISOs:"
     for k in "${!VM_ISOS[@]}"; do
-      echo "  $k -> ${VM_ISOS[$k]}"
+      echo "${_f7-}  $k ${NORMAL-}-> ${VM_ISOS[$k]}"
     done
   else
     failmsg "No seed ISO image configured! (vm/seeds.conf: VM_ISOS)"

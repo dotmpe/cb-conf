@@ -2,8 +2,6 @@
 # The config disc dials the shares, then sources this file from the repo share.
 # Edit it on the host; the guest sees the file through that share.
 
-# Configure profile
-
 # Setup work checkout
 if (~ $#GIT_URL 0) GIT_URL=''
 if (~ $#GIT_DEST 0) GIT_DEST=''

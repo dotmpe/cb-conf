@@ -22,8 +22,9 @@ case terminal
 	echo -n 'res 3' > '#m/mousectl'
 	prompt=('term% ' '	')
 	fn term%{ $* }
-    @{rfork n; aux/realemu; aux/vga -l $vgasize}
-    rio -i riostart
+  @{rfork n; aux/realemu; aux/vga -l $vgasize}
+  ip/ipconfig
+  rio -i riostart
 case cpu
 	bind /mnt/term/dev/cons /dev/cons
 	bind -q /mnt/term/dev/consctl /dev/consctl

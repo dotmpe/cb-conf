@@ -23,7 +23,7 @@ PATH+=:${U_S:?User profile broken}/tool/bash/include
 . "us-call.inc.bash"
 
 script_cmdname=uc-vm
-userscripts::call_all _init userscripts::{core,common}
+userscripts::call_all _init userscripts::{core,common,shell}
 userscripts::use_all userscripts::{core,common}
 
 PATH+=:${REPO_ROOT}/tool/bash/include

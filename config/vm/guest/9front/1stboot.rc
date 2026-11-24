@@ -1,0 +1,31 @@
+if (! test -f $home/etc/1stboot_complete) {
+    9fs 9fat
+    grep 'monitor=' /n/9fat/plan9.ini || {
+        cat <<'EOF' >>/n/9fat/plan9.ini
+nobootprompt=local!/dev/sdC0/fs
+user=glenda
+monitor=vesa
+vgasize=1024x768x32
+EOF
+        echo "! plan9.ini reconfigured, inspect changes and run fshalt -r"
+    }
+    hget $conf_url/lib/profile.rc > lib/profile
+    hget $conf_url/rc/bin/termrc.local > /rc/bin/termrc.local
+    hget $conf_url/bin/rc/riostart > bin/rc/riostart
+    mkdir $home/etc
+    touch $home/etc/1stboot_complete
+}
+mkdir -p $home/src/local $home/src/vendor \
+  $home/git/local $home/git/vendor $home/lib/git
+
+# TODO: Config (git) user other than glenda
+
+# if (! test -s $home/lib/git/config) {
+#    
+#     cat <<'EOF' >>$home/lib/git/config
+# [user]
+#     name=$GIT_NAME
+#     email=$GIT_EMAIL
+# EOF
+# }
+# or: hget $conf_url/lib/git/config-user > lib/git/config
